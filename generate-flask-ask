@@ -22,7 +22,7 @@ def launched():
 
 %(signatures)s"""
 
-SIGNATURE_TEMPLATE = """@ask.Intent('%(intent_name)s%(conversions)s')
+SIGNATURE_TEMPLATE = """@ask.intent('%(intent_name)s'%(conversions)s)
 def handle_%(snake_case_name)s(%(params)s):
     pass
 """
@@ -58,10 +58,10 @@ def generate_intent_signature(intent):
         for slot in intent['slots']:
             slot_names.append(slot['name'])
             if slot['type'] == 'AMAZON.NUMBER':
-                convert_args.append('convert={\'%s\': int}' % slot['name'])
+                convert_args.append('\'%s\': int' % slot['name'])
     data['params'] = ', '.join(slot_names)
     if convert_args:
-        data['conversions'] = ', ' + ', '.join(convert_args)
+        data['conversions'] = ', convert={%s}' % ', '.join(convert_args)
     else:
         data['conversions'] = ''
 
