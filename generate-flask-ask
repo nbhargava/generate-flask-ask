@@ -1,0 +1,86 @@
+#! /usr/bin/env python
+
+import json
+import sys
+
+FILE_TEMPLATE = """from flask import Flask
+from flask_ask import Ask, question, session, statement
+
+app = Flask(__name__)
+ask = Ask(app, '/')
+
+
+@ask.on_session_started
+def new_session():
+    pass
+
+
+@ask.launch
+def launched():
+    pass
+
+
+%(signatures)s"""
+
+SIGNATURE_TEMPLATE = """@ask.Intent('%(intent_name)s%(conversions)s')
+def handle_%(snake_case_name)s(%(params)s):
+    pass
+"""
+
+
+def report_error_with_input_file():
+    print('Usage: generate-flask-ask <intents.json> <output file>')
+    exit(1)
+
+
+def name_to_snake_case(name):
+    if name.startswith('AMAZON.'):
+        name = 'Amazon' + name[len('AMAZON.'):]
+
+    # TODO: Could probably be done more simply with regex
+    new_name = ''
+    for c in name:
+        if c.isupper() and len(new_name) > 0:
+            new_name += '_'
+        new_name += c
+    return new_name.lower()
+
+
+def generate_intent_signature(intent):
+    data = {
+        'intent_name': intent['intent'],
+        'snake_case_name': name_to_snake_case(intent['intent']),
+    }
+
+    slot_names = []
+    convert_args = []
+    if 'slots' in intent:
+        for slot in intent['slots']:
+            slot_names.append(slot['name'])
+            if slot['type'] == 'AMAZON.NUMBER':
+                convert_args.append('convert={\'%s\': int}' % slot['name'])
+    data['params'] = ', '.join(slot_names)
+    if convert_args:
+        data['conversions'] = ', ' + ', '.join(convert_args)
+    else:
+        data['conversions'] = ''
+
+    return SIGNATURE_TEMPLATE % data
+
+
+def main():
+    try:
+        intents_file = sys.argv[1]
+        signatures = []
+        with open(intents_file, 'rb') as f:
+            intents = json.load(f)['intents']
+            for intent_dict in intents:
+                signatures.append(generate_intent_signature(intent_dict))
+            with open(sys.argv[2], 'wb') as f:
+                f.write(FILE_TEMPLATE % {'signatures': '\n\n'.join(signatures)})
+    except (IndexError, IOError, KeyError):
+        report_error_with_input_file()
+
+
+if __name__ == '__main__':
+    main()
